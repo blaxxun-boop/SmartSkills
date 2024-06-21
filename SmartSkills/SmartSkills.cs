@@ -15,7 +15,7 @@ namespace SmartSkills;
 public class SmartSkills : BaseUnityPlugin
 {
 	private const string ModName = "Smart Skills";
-	private const string ModVersion = "1.0.1";
+	private const string ModVersion = "1.0.2";
 	private const string ModGUID = "org.bepinex.plugins.smartskills";
 
 	private static readonly ConfigSync configSync = new(ModName) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
@@ -208,7 +208,7 @@ public class SmartSkills : BaseUnityPlugin
 	{
 		private static void Prefix(Character __instance, HitData hit)
 		{
-			if (hit.GetAttacker() is Player player && !__instance.GetBaseAI().m_alerted && !__instance.GetBaseAI().HaveTarget())
+			if (hit.GetAttacker() is Player player && __instance.GetBaseAI() is { m_alerted: false } baseAi && !baseAi.HaveTarget())
 			{
 				hit.m_backstabBonus *= 1 + player.GetSkillFactor(Skills.SkillType.Sneak) * (sneakBonusDamage.Value / 100f);
 				player.RaiseSkill(Skills.SkillType.Sneak, sneakBonusExperience.Value);
