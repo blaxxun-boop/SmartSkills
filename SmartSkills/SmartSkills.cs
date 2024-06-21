@@ -15,7 +15,7 @@ namespace SmartSkills;
 public class SmartSkills : BaseUnityPlugin
 {
 	private const string ModName = "Smart Skills";
-	private const string ModVersion = "1.0.0";
+	private const string ModVersion = "1.0.1";
 	private const string ModGUID = "org.bepinex.plugins.smartskills";
 
 	private static readonly ConfigSync configSync = new(ModName) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
@@ -27,6 +27,8 @@ public class SmartSkills : BaseUnityPlugin
 	private static ConfigEntry<int> swimmingSkillGainIncrease = null!;
 	private static ConfigEntry<int> shieldAttackXpFactor = null!;
 	private static ConfigEntry<Toggle> removeShieldExpireXp = null!;
+	private static ConfigEntry<float> sneakBonusDamage = null!;
+	private static ConfigEntry<float> sneakBonusExperience = null!;
 
 	private ConfigEntry<T> config<T>(string group, string name, T value, ConfigDescription description, bool synchronizedSetting = true)
 	{
@@ -82,6 +84,8 @@ public class SmartSkills : BaseUnityPlugin
 		swimmingSkillGainIncrease = config("3 - Swimming", "Swimming experience bonus", 100, new ConfigDescription("Bonus XP in percent the swimming skill gets.", new AcceptableValueRange<int>(0, 200)));
 		shieldAttackXpFactor = config("4 - Blood Magic", "Shield attack XP factor", 33, new ConfigDescription("The caster of a shield will gain a percentage of the weapon XP the shielded attacker gets.", new AcceptableValueRange<int>(0, 100)));
 		removeShieldExpireXp = config("4 - Blood Magic", "Remove shield expired XP", Toggle.On, "If on, the shielded player will not gain blood magic XP, if the shield expires.");
+		sneakBonusDamage = config("5 - Sneak", "Sneak bonus damage", 50f,  new ConfigDescription("Bonus damage in percent unaware enemies take if attacked while sneaking at skill level 100.", new AcceptableValueRange<float>(0f, 200f)));
+		sneakBonusExperience = config("5 - Sneak", "Sneak bonus experience", 20f,  new ConfigDescription("Bonus experience the sneak skill gains, if you attack an unaware enemy while sneaking.", new AcceptableValueRange<float>(0f, 200f)));
 
 		Assembly assembly = Assembly.GetExecutingAssembly();
 		Harmony harmony = new(ModGUID);
@@ -136,7 +140,7 @@ public class SmartSkills : BaseUnityPlugin
 
 			if (skills.Contains(__instance.m_info.m_skill))
 			{
-				float highestSkillLevel = skills.Max(s => Player.m_localPlayer.m_skills.GetSkill(s).m_level);
+				float highestSkillLevel = skills.Max(s => Player.m_localPlayer.m_skills.m_skillData.TryGetValue(s, out Skills.Skill skill) ? skill.m_level : 0);
 				if (__instance.m_level < highestSkillLevel)
 				{
 					factor *= 1 + catchupBonus.Value / 100f;
@@ -195,6 +199,19 @@ public class SmartSkills : BaseUnityPlugin
 				{
 					ZRoutedRpc.instance.InvokeRoutedRPC(caster.UserID, caster, "SmartSkills RaiseBloodMagic", value * statusEffect.m_levelUpSkillFactor * shieldAttackXpFactor.Value / 100f);
 				}
+			}
+		}
+	}
+
+	[HarmonyPatch(typeof(Character), nameof(Character.Damage))]
+	private static class IncreaseSneakDamage
+	{
+		private static void Prefix(Character __instance, HitData hit)
+		{
+			if (hit.GetAttacker() is Player player && !__instance.GetBaseAI().m_alerted && !__instance.GetBaseAI().HaveTarget())
+			{
+				hit.m_backstabBonus *= 1 + player.GetSkillFactor(Skills.SkillType.Sneak) * (sneakBonusDamage.Value / 100f);
+				player.RaiseSkill(Skills.SkillType.Sneak, sneakBonusExperience.Value);
 			}
 		}
 	}
